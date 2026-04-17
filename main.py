@@ -8,24 +8,33 @@ from textual.binding import Binding
 class MusicPlayerApp(App):
     """A Cross-Platform TUI Music Player"""
     
+    TITLE = "🎵 TUI Music Player 🎵"
+    
     CSS = """
+    Screen {
+        background: $surface-darken-1;
+    }
     DataTable {
         height: 1fr;
+        margin: 1 2;
+        border: round $primary;
+        background: $surface;
     }
     #status {
         height: 3;
+        margin: 0 2 1 2;
         dock: bottom;
         content-align: center middle;
-        background: $boost;
+        background: $panel;
         color: $text;
-        border-top: solid $primary;
+        border: round $secondary;
+        text-style: bold;
     }
     """
 
     BINDINGS = [
         Binding("p", "play", "Play", priority=True),
-        Binding("space", "pause", "Pause", priority=True),
-        Binding("r", "resume", "Resume", priority=True),
+        Binding("space", "toggle_pause", "Pause/Resume", priority=True),
         Binding("n", "next", "Next", priority=True),
         Binding("b", "previous", "Previous", priority=True),
         Binding("q", "quit", "Quit", priority=True),
@@ -49,6 +58,7 @@ class MusicPlayerApp(App):
         
         table = self.query_one(DataTable)
         table.cursor_type = "row"
+        table.zebra_stripes = True
         table.add_columns("ID", "Song Name")
         for idx, song in enumerate(self.songs):
             table.add_row(str(idx + 1), song)
@@ -79,15 +89,13 @@ class MusicPlayerApp(App):
             except pygame.error:
                 pass # Optionally show error in status
 
-    def action_pause(self) -> None:
+    def action_toggle_pause(self) -> None:
         if self.is_playing:
             pygame.mixer.music.pause()
             self.is_playing = False
             self.is_paused = True
             self.update_status()
-
-    def action_resume(self) -> None:
-        if self.is_paused:
+        elif self.is_paused:
             pygame.mixer.music.unpause()
             self.is_playing = True
             self.is_paused = False

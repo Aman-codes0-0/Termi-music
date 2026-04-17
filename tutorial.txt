@@ -35,9 +35,10 @@ python main.py
 -----------
 When the Terminal UI opens, you can use your mouse or your keyboard:
 - Use the 'Tab' and 'Shift+Tab' keys to navigate between buttons and lists.
-- Press 'Enter' or 'Space' to trigger a button.
+- Press 'Enter' or 'Space' to trigger a highlighted button.
 - Select a song from the directory list to load it.
-- Use Play, Pause, Next, and Previous buttons for active control.
+- Press the 'Spacebar' keyboard shortcut at any time to explicitly toggle Pause/Resume.
+- Use Play, Next, and Previous buttons for active navigation.
 
 6. BUILDING AN EXECUTABLE
 -------------------------
