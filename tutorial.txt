@@ -1,0 +1,47 @@
+=======================================
+   TUI Music Player - Quick Tutorial
+=======================================
+
+1. PREREQUISITES
+----------------
+Make sure you have Python 3.10 or newer installed on your computer.
+
+2. INSTALLATION
+---------------
+Open your terminal and navigate to this project folder, then run:
+
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+# On Linux/macOS:
+source venv/bin/activate
+# On Windows:
+venv\Scripts\activate
+
+# Install the required libraries
+pip install -r requirements.txt
+
+3. ADDING MUSIC
+---------------
+Place all your `.mp3` files directly into the `songs/` folder in the project directory. Three sample tracks are provided.
+
+4. RUNNING THE PLAYER
+---------------------
+Once the virtual environment is activated, simply run:
+python main.py
+
+5. CONTROLS
+-----------
+When the Terminal UI opens, you can use your mouse or your keyboard:
+- Use the 'Tab' and 'Shift+Tab' keys to navigate between buttons and lists.
+- Press 'Enter' or 'Space' to trigger a button.
+- Select a song from the directory list to load it.
+- Use Play, Pause, Next, and Previous buttons for active control.
+
+6. BUILDING AN EXECUTABLE
+-------------------------
+To build a standalone executable file for your current OS:
+pyinstaller main.spec
+The binary will be generated inside the `dist/` folder.
+=======================================
