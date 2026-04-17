@@ -11,7 +11,6 @@ __pycache__/
 # Builds
 build/
 dist/
-*.spec
 
 # OS
 .DS_Store
