@@ -1,7 +1,7 @@
 # TUI Music Player
 
 *(Add your screenshot here by uploading an image named `screenshot.png` to the repository!)*
-![TUI Music Player Screenshot](screenshot.png)
+![TUI Music Player Screenshot](image.png)
 
 A lightweight, cross-platform terminal-based music player built with Python, [Textual](https://textual.textualize.io/) for the UI, and [Pygame](https://www.pygame.org/) for audio playback.
 
