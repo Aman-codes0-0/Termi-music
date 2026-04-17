@@ -18,5 +18,8 @@ See the `tutorial.txt` file for a full step-by-step walkthrough on how to set up
 This project includes a fully automated **GitHub Actions** CI/CD pipeline (`.github/workflows/build.yml`). 
 Whenever new code is pushed to standard branches, the system automatically spins up Windows, macOS, and Ubuntu cloud machines to build standalone, ready-to-run executables across all three operating systems natively!
 
+## Author
+Developed by [Aman-codes0-0](https://github.com/Aman-codes0-0).
+
 ## License
 This project is licensed under the MIT License - see the `LICENSE` file for details.
