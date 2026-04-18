@@ -7,7 +7,6 @@ A lightweight, cross-platform terminal-based music player built with Python, [Te
 ## Features
 - **Dynamic File Explorer**: Built-in visual `DirectoryTree` to navigate locally and pick music folders seamlessly!
 - **Persistent Themes**: Press `d` to open a 40+ color Theme Selector Modal. Your choice is saved securely.
-- **Audio Visualizer**: Press `v` to toggle a sleek, aesthetic ASCII bouncing equalizer visualizer!
 - Complete playback controls: Play, Stop, Next, Previous, and an intuitive Spacebar Pause/Resume toggle.
 - Aesthetic, modern terminal interface with zebra-striped panels.
 

@@ -10,7 +10,6 @@ from textual.screen import ModalScreen
 
 from scanner import scan_folder, FolderNotFoundError, NoAudioFilesFoundError
 from player import MusicPlayer
-from visualizer import AudioVisualizer
 
 CONFIG_FILE = "config.json"
 
@@ -66,7 +65,6 @@ class ThemeSelector(ModalScreen):
     def action_dismiss_modal(self) -> None:
         self.dismiss()
 
-
 class MusicPlayerApp(App):
     """A Cross-Platform TUI Music Player"""
     
@@ -94,13 +92,6 @@ class MusicPlayerApp(App):
         border: round $primary;
         background: $surface;
     }
-    #visualizer {
-        height: 1;
-        margin: 0 2 0 2;
-        dock: bottom;
-        color: $accent;
-        content-align: center middle;
-    }
     #status {
         height: 3;
         margin: 0 2 1 2;
@@ -118,7 +109,6 @@ class MusicPlayerApp(App):
         Binding("space", "toggle_pause", "Pause/Resume", priority=True),
         Binding("n", "next", "Next", priority=True),
         Binding("b", "previous", "Previous", priority=True),
-        Binding("v", "toggle_visualizer", "Visualizer", priority=True),
         Binding("d", "select_theme", "Themes", priority=True),
         Binding("q", "quit", "Quit", priority=True),
     ]
@@ -128,14 +118,11 @@ class MusicPlayerApp(App):
         with Horizontal():
             yield DirectoryTree(os.path.expanduser("~"), id="directory_tree")
             yield DataTable(id="song_list")
-        yield AudioVisualizer(id="visualizer")
         yield Static("Status: Select a folder from the tree on the left", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
-        # Load persistent theme on startup
         self.theme = load_theme()
-        
         self.player = MusicPlayer()
         self.active_folder = ""
         
@@ -199,10 +186,6 @@ class MusicPlayerApp(App):
         self.watch_player_index()
         self.update_status()
 
-    def action_toggle_visualizer(self) -> None:
-        vis = self.query_one(AudioVisualizer)
-        vis.is_active = not vis.is_active
-
     def action_select_theme(self) -> None:
         self.push_screen(ThemeSelector())
 
@@ -212,11 +195,6 @@ class MusicPlayerApp(App):
 
     def update_status(self) -> None:
         status_widget = self.query_one("#status", Static)
-        
-        # Sync visualizer state
-        vis = self.query_one(AudioVisualizer)
-        vis.is_playing = self.player.is_playing
-        
         if not self.player.playlist:
             status_widget.update("Status: Select a folder from the tree on the left")
             return

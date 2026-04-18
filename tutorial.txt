@@ -40,7 +40,6 @@ When the Terminal UI opens, you can use your mouse or your keyboard:
 - Select a song from the table on the right to play it.
 - Press the 'Spacebar' keyboard shortcut at any time to toggle Pause/Resume.
 - Press 'd' to open the Themes selector (your choice will be saved permanently!).
-- Press 'v' to toggle the built-in bouncing Equalizer Visualizer.
 - Use Play, Next, and Previous buttons or mouse clicks for active navigation.
 
 6. BUILDING AN EXECUTABLE
