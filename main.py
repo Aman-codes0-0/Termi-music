@@ -1,24 +1,105 @@
 import os
-import pygame
+import json
 from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static
+from textual.widgets import Header, Footer, DataTable, Static, DirectoryTree, OptionList
+from textual.widgets.option_list import Option
 from textual.binding import Binding
+from textual.containers import Horizontal
+from textual.screen import ModalScreen
+
+from scanner import scan_folder, FolderNotFoundError, NoAudioFilesFoundError
+from player import MusicPlayer
+from visualizer import AudioVisualizer
+
+CONFIG_FILE = "config.json"
+
+def load_theme() -> str:
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                data = json.load(f)
+                return data.get("theme", "textual-dark")
+        except:
+            pass
+    return "textual-dark"
+
+def save_theme(theme_name: str) -> None:
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump({"theme": theme_name}, f)
+    except:
+        pass
+
+class ThemeSelector(ModalScreen):
+    """Modal screen that shows all available themes."""
+    
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
+    
+    CSS = """
+    ThemeSelector {
+        align: center middle;
+    }
+    #theme_list {
+        width: 50%;
+        height: 60%;
+        border: solid $secondary;
+        background: $surface;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        themes = list(self.app.available_themes.keys())
+        themes.sort()
+        yield OptionList(*[Option(str(t), id=str(t)) for t in themes], id="theme_list")
+
+    def on_mount(self) -> None:
+        list_widget = self.query_one(OptionList)
+        list_widget.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        selected_theme = event.option.id
+        self.app.theme = selected_theme
+        save_theme(selected_theme)
+        self.dismiss()
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss()
+
 
 class MusicPlayerApp(App):
     """A Cross-Platform TUI Music Player"""
     
     TITLE = "🎵 TUI Music Player 🎵"
+    ENABLE_COMMAND_PALETTE = False
     
     CSS = """
     Screen {
         background: $surface-darken-1;
     }
-    DataTable {
+    Horizontal {
         height: 1fr;
-        margin: 1 2;
+    }
+    DirectoryTree {
+        width: 30%;
+        height: 1fr;
+        margin: 1 1;
+        border: round $secondary;
+        background: $surface;
+    }
+    DataTable {
+        width: 70%;
+        height: 1fr;
+        margin: 1 2 1 0;
         border: round $primary;
         background: $surface;
+    }
+    #visualizer {
+        height: 1;
+        margin: 0 2 0 2;
+        dock: bottom;
+        color: $accent;
+        content-align: center middle;
     }
     #status {
         height: 3;
@@ -37,116 +118,122 @@ class MusicPlayerApp(App):
         Binding("space", "toggle_pause", "Pause/Resume", priority=True),
         Binding("n", "next", "Next", priority=True),
         Binding("b", "previous", "Previous", priority=True),
+        Binding("v", "toggle_visualizer", "Visualizer", priority=True),
+        Binding("d", "select_theme", "Themes", priority=True),
         Binding("q", "quit", "Quit", priority=True),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield DataTable(id="song_list")
-        yield Static("Status: Stopped", id="status")
+        with Horizontal():
+            yield DirectoryTree(os.path.expanduser("~"), id="directory_tree")
+            yield DataTable(id="song_list")
+        yield AudioVisualizer(id="visualizer")
+        yield Static("Status: Select a folder from the tree on the left", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
-        # Initialize pygame audio engine
-        pygame.mixer.init()
+        # Load persistent theme on startup
+        self.theme = load_theme()
         
-        # Load songs
-        self.song_dir = Path("songs")
-        self.song_dir.mkdir(exist_ok=True)
-        self.songs = [f.name for f in self.song_dir.glob("*.mp3")]
-        self.songs.sort()
+        self.player = MusicPlayer()
+        self.active_folder = ""
         
         table = self.query_one(DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
         table.add_columns("ID", "Song Name")
-        for idx, song in enumerate(self.songs):
-            table.add_row(str(idx + 1), song)
         
-        self.current_index = 0 if self.songs else -1
-        self.is_playing = False
-        self.is_paused = False
-        
-        self.update_status()
-        
-        # Periodically check if the song has finished
         self.set_interval(1.0, self.check_music_end)
-
-    def watch_current_index(self) -> None:
-        if self.current_index != -1 and self.songs:
+        
+    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
+        self.load_folder(str(event.path))
+        
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        self.load_folder(str(event.path.parent))
+        
+    def load_folder(self, folder_path: str) -> None:
+        try:
+            songs = scan_folder(folder_path)
+            self.active_folder = folder_path
+            self.player.load_playlist(songs)
+            
             table = self.query_one(DataTable)
-            table.move_cursor(row=self.current_index)
+            table.clear()
+            for idx, song in enumerate(songs):
+                table.add_row(str(idx + 1), os.path.basename(song))
+                
+            self.notify(f"Successfully loaded {len(songs)} tracks!", title="Scanning Complete")
+            self.update_status()
+            
+        except FolderNotFoundError as e:
+            self.notify(str(e), title="Path Error", severity="error")
+        except NoAudioFilesFoundError:
+            self.notify(f"No files found in {os.path.basename(folder_path)}", title="No Audio", severity="warning")
+
+    def watch_player_index(self) -> None:
+        if self.player.current_index != -1 and self.player.playlist:
+            table = self.query_one(DataTable)
+            table.move_cursor(row=self.player.current_index)
             
     def action_play(self) -> None:
-        if self.current_index != -1 and not self.is_playing and not self.is_paused:
-            song_path = self.song_dir / self.songs[self.current_index]
-            try:
-                pygame.mixer.music.load(str(song_path))
-                pygame.mixer.music.play()
-                self.is_playing = True
-                self.is_paused = False
-                self.update_status()
-            except pygame.error:
-                pass # Optionally show error in status
+        if not self.player.is_playing and not self.player.is_paused:
+            table = self.query_one(DataTable)
+            if table.cursor_row is not None and self.player.playlist:
+                self.player.play(table.cursor_row)
+            else:
+                return
+        self.update_status()
 
     def action_toggle_pause(self) -> None:
-        if self.is_playing:
-            pygame.mixer.music.pause()
-            self.is_playing = False
-            self.is_paused = True
-            self.update_status()
-        elif self.is_paused:
-            pygame.mixer.music.unpause()
-            self.is_playing = True
-            self.is_paused = False
-            self.update_status()
+        self.player.toggle_pause()
+        self.update_status()
 
     def action_next(self) -> None:
-        if self.songs:
-            self.current_index = (self.current_index + 1) % len(self.songs)
-            self.is_playing = False
-            self.is_paused = False
-            pygame.mixer.music.stop()
-            self.watch_current_index()
-            self.action_play()
+        self.player.next()
+        self.watch_player_index()
+        self.update_status()
 
     def action_previous(self) -> None:
-        if self.songs:
-            self.current_index = (self.current_index - 1) % len(self.songs)
-            self.is_playing = False
-            self.is_paused = False
-            pygame.mixer.music.stop()
-            self.watch_current_index()
-            self.action_play()
+        self.player.previous()
+        self.watch_player_index()
+        self.update_status()
+
+    def action_toggle_visualizer(self) -> None:
+        vis = self.query_one(AudioVisualizer)
+        vis.is_active = not vis.is_active
+
+    def action_select_theme(self) -> None:
+        self.push_screen(ThemeSelector())
 
     def action_quit(self) -> None:
-        pygame.mixer.quit()
+        self.player.quit()
         self.exit()
 
     def update_status(self) -> None:
         status_widget = self.query_one("#status", Static)
-        if self.current_index == -1:
-            status_widget.update("Status: No .mp3 files found in songs/ directory.")
+        
+        # Sync visualizer state
+        vis = self.query_one(AudioVisualizer)
+        vis.is_playing = self.player.is_playing
+        
+        if not self.player.playlist:
+            status_widget.update("Status: Select a folder from the tree on the left")
             return
 
-        song_name = self.songs[self.current_index]
-        state = "Playing" if self.is_playing else ("Paused" if self.is_paused else "Stopped")
-        status_widget.update(f"Status: {state} | Current Song: {song_name}")
+        song_name = self.player.get_current_song_name()
+        state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
+        status = f"Folder: {os.path.basename(self.active_folder)} | Total: {len(self.player.playlist)} | {state} | Song: {song_name}"
+        status_widget.update(status)
 
     def check_music_end(self) -> None:
-        # Pygame mixer music get_busy returns False when stopped or finished
-        if self.is_playing and not pygame.mixer.music.get_busy():
-            # Only go to next song if it actually stopped playing without user pause
+        if self.player.check_finished_naturally():
             self.action_next()
             
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        # User clicked or pressed enter on a row
-        self.current_index = event.cursor_row
-        self.is_playing = False
-        self.is_paused = False
-        pygame.mixer.music.stop()
-        self.action_play()
-
+        self.player.stop()
+        self.player.play(event.cursor_row)
+        self.update_status()
 
 if __name__ == "__main__":
     app = MusicPlayerApp()

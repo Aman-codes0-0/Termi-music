@@ -1,15 +1,15 @@
 # TUI Music Player
 
-*(Add your screenshot here by uploading an image named `screenshot.png` to the repository!)*
 ![TUI Music Player Screenshot](image.png)
 
 A lightweight, cross-platform terminal-based music player built with Python, [Textual](https://textual.textualize.io/) for the UI, and [Pygame](https://www.pygame.org/) for audio playback.
 
 ## Features
-- Play, Stop, and intuitive Spacebar Pause/Resume toggle
-- Next and Previous track navigation
-- Aesthetic, modern terminal interface with zebra-striped tables
-- Loads MP3 files directly from the `songs/` directory natively.
+- **Dynamic File Explorer**: Built-in visual `DirectoryTree` to navigate locally and pick music folders seamlessly!
+- **Persistent Themes**: Press `d` to open a 40+ color Theme Selector Modal. Your choice is saved securely.
+- **Audio Visualizer**: Press `v` to toggle a sleek, aesthetic ASCII bouncing equalizer visualizer!
+- Complete playback controls: Play, Stop, Next, Previous, and an intuitive Spacebar Pause/Resume toggle.
+- Aesthetic, modern terminal interface with zebra-striped panels.
 
 ## Getting Started
 See the `tutorial.txt` file for a full step-by-step walkthrough on how to set up, run, and interact with this application!

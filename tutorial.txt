@@ -22,9 +22,10 @@ venv\Scripts\activate
 # Install the required libraries
 pip install -r requirements.txt
 
-3. ADDING MUSIC
----------------
-Place all your `.mp3` files directly into the `songs/` folder in the project directory. Three sample tracks are provided.
+3. NAVIGATING MUSIC
+-------------------
+Use the built-in Directory Explorer on the left panel to browse your computer! 
+Just click or press Enter on any folder containing `.mp3`, `.wav`, `.flac`, or `.ogg` files to instantly load them into your playlist.
 
 4. RUNNING THE PLAYER
 ---------------------
@@ -34,11 +35,13 @@ python main.py
 5. CONTROLS
 -----------
 When the Terminal UI opens, you can use your mouse or your keyboard:
-- Use the 'Tab' and 'Shift+Tab' keys to navigate between buttons and lists.
-- Press 'Enter' or 'Space' to trigger a highlighted button.
-- Select a song from the directory list to load it.
-- Press the 'Spacebar' keyboard shortcut at any time to explicitly toggle Pause/Resume.
-- Use Play, Next, and Previous buttons for active navigation.
+- Use the 'Tab' and 'Shift+Tab' keys to navigate between panels and buttons.
+- Select a folder from the tree on the left to automatically scan it.
+- Select a song from the table on the right to play it.
+- Press the 'Spacebar' keyboard shortcut at any time to toggle Pause/Resume.
+- Press 'd' to open the Themes selector (your choice will be saved permanently!).
+- Press 'v' to toggle the built-in bouncing Equalizer Visualizer.
+- Use Play, Next, and Previous buttons or mouse clicks for active navigation.
 
 6. BUILDING AN EXECUTABLE
 -------------------------
