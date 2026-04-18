@@ -114,22 +114,53 @@ class MusicPlayerApp(App):
         Binding("q", "quit", "Quit", priority=True),
     ]
 
+    def get_compact_css(self) -> str:
+        """Returns compact CSS for Termux/Mobile."""
+        return """
+        Input {
+            margin: 0 1;
+            border: tall $secondary;
+        }
+        DataTable {
+            margin: 0 1;
+            border: none;
+        }
+        #status {
+            height: 2;
+            margin: 0;
+            border: none;
+            background: $surface;
+            text-style: none;
+            font-size: 80%;
+        }
+        """
+
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Input(placeholder="Search for any song, artist, or album on YouTube Music... (Press Enter)", id="search_input")
+        yield Input(placeholder="Search YouTube Music...", id="search_input")
         yield DataTable(id="song_list")
-        yield Static("Status: Ready to search", id="status")
+        yield Static("Status: Ready", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
         self.theme = load_theme()
+        from api import is_termux
+        if is_termux():
+            self.add_class("compact-mode")
+            # Inject compact CSS
+            self.app.stylesheet.add_source(self.get_compact_css())
+            
         self.player = MusicPlayer()
         self.active_query = ""
         
         table = self.query_one(DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("ID", "Artist", "Song Name", "Duration")
+        
+        if is_termux():
+            table.add_columns("Artist", "Song")
+        else:
+            table.add_columns("ID", "Artist", "Song Name", "Duration")
         
         self.set_interval(1.0, self.check_music_end)
         
@@ -148,8 +179,14 @@ class MusicPlayerApp(App):
         
         table = self.query_one(DataTable)
         table.clear()
+        from api import is_termux
         for idx, song in enumerate(results):
-            table.add_row(str(idx + 1), song["artists"], song["title"], song["duration"])
+            if is_termux():
+                # Shorten artist names for mobile
+                artist = song["artists"].split(",")[0][:15]
+                table.add_row(artist, song["title"])
+            else:
+                table.add_row(str(idx + 1), song["artists"], song["title"], song["duration"])
             
         self.notify(f"Found {len(results)} results!", title="Search Complete")
         self.update_status()
@@ -267,7 +304,12 @@ class MusicPlayerApp(App):
 
         song_name = self.player.get_current_song_name()
         state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
-        status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {mode_str}Song: {song_name}"
+        
+        from api import is_termux
+        if is_termux():
+            status = f"{state} | {vol_state} | {song_name[:20]}"
+        else:
+            status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {mode_str}Song: {song_name}"
         status_widget.update(status)
 
     def check_music_end(self) -> None:

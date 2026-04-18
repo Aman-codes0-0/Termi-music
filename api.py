@@ -4,11 +4,29 @@ import os
 import threading
 
 ytmusic = YTMusic()
-CACHE_DIR = "/tmp/tui_music_cache"
-download_lock = threading.Lock()
-
 def is_termux() -> bool:
     return 'com.termux' in os.environ.get('PREFIX', '') or 'ANDROID_ROOT' in os.environ
+
+def get_cache_dir() -> str:
+    """Returns a writable cache directory, prioritized for Termux/Mobile."""
+    if is_termux():
+        # Use $HOME/.cache/tui_music_player in Termux
+        base = os.environ.get('HOME', '/data/data/com.termux/files/home')
+        path = os.path.join(base, '.cache', 'tui_music_cache')
+    else:
+        path = "/tmp/tui_music_cache"
+    
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except Exception:
+            # Fallback to local directory if all else fails
+            path = os.path.join(os.getcwd(), ".tui_music_cache")
+            os.makedirs(path, exist_ok=True)
+    return path
+
+CACHE_DIR = get_cache_dir()
+download_lock = threading.Lock()
 
 def get_ffmpeg_path() -> str:
     if is_termux():
@@ -20,8 +38,9 @@ def get_ffmpeg_path() -> str:
         return 'ffmpeg'
 
 def ensure_cache():
+    # Cache directory is now ensured during get_cache_dir() initialization
     if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR)
+        os.makedirs(CACHE_DIR, exist_ok=True)
 
 def search_songs(query: str, limit: int = 20):
     """Search for songs returning a list of dictionaries with metadata."""
@@ -70,7 +89,12 @@ def download_audio(video_id: str) -> str:
             'noprogress': True
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except Exception as e:
+            if "ffmpeg" in str(e).lower():
+                raise RuntimeError("FFmpeg not found. Please install it using 'pkg install ffmpeg' in Termux.")
+            raise RuntimeError(f"Download failed: {str(e)}")
             
         return out_path

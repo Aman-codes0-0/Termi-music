@@ -143,7 +143,15 @@ class TermuxPlayer(BaseMusicPlayer):
     """
     def __init__(self):
         super().__init__()
-        
+        self._check_tools()
+
+    def _check_tools(self):
+        try:
+            subprocess.run(["termux-media-player", "help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            print("\n[!] Error: termux-api tools not found.")
+            print("Please run: pkg install termux-api\n")
+
     def _apply_volume(self) -> None:
         try:
             vol_val = 0 if self.is_muted else int(self.volume * 15)
@@ -154,7 +162,10 @@ class TermuxPlayer(BaseMusicPlayer):
     def play_local_file(self, index: int, filepath: str) -> None:
         try:
             self.stop()
-            subprocess.run(["termux-media-player", "play", filepath], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(["termux-media-player", "play", filepath], capture_output=True, text=True)
+            if result.returncode != 0:
+                # Handle potential error if termux-media-player fails
+                pass
             self.current_index = index
             self.is_playing = True
             self.is_paused = False
