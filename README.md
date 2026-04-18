@@ -62,3 +62,15 @@ A lightweight, terminal-based music player that streams directly from YouTube Mu
 - `d`: Change Theme
 - `Esc`: Focus Song List
 - `q`: Quit
+
+## 🔨 Build from Source (Standalone Binary)
+If you want to create a standalone executable that doesn't require Python:
+1. Install PyInstaller:
+   ```bash
+   pip install pyinstaller
+   ```
+2. Run the build command:
+   ```bash
+   pyinstaller --onefile --name "tui-music-player" --clean main.py
+   ```
+3. The binary will be available in the `dist/` folder.
