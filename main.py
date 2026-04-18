@@ -2,13 +2,13 @@ import os
 import json
 from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, DirectoryTree, OptionList
+from textual.widgets import Header, Footer, DataTable, Static, Input, OptionList
 from textual.widgets.option_list import Option
 from textual.binding import Binding
-from textual.containers import Horizontal
 from textual.screen import ModalScreen
+from textual import work
 
-from scanner import scan_folder, FolderNotFoundError, NoAudioFilesFoundError
+from api import search_songs, download_audio
 from player import MusicPlayer
 
 CONFIG_FILE = "config.json"
@@ -68,27 +68,21 @@ class ThemeSelector(ModalScreen):
 class MusicPlayerApp(App):
     """A Cross-Platform TUI Music Player"""
     
-    TITLE = "🎵 TUI Music Player 🎵"
+    TITLE = "🎵 Cloud TUI Music Player 🎵"
     ENABLE_COMMAND_PALETTE = False
     
     CSS = """
     Screen {
         background: $surface-darken-1;
     }
-    Horizontal {
-        height: 1fr;
-    }
-    DirectoryTree {
-        width: 30%;
-        height: 1fr;
-        margin: 1 1;
-        border: round $secondary;
-        background: $surface;
+    Input {
+        dock: top;
+        margin: 1 2 0 2;
+        border: tall $secondary;
     }
     DataTable {
-        width: 70%;
         height: 1fr;
-        margin: 1 2 1 0;
+        margin: 1 2;
         border: round $primary;
         background: $surface;
     }
@@ -115,76 +109,93 @@ class MusicPlayerApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Horizontal():
-            yield DirectoryTree(os.path.expanduser("~"), id="directory_tree")
-            yield DataTable(id="song_list")
-        yield Static("Status: Select a folder from the tree on the left", id="status")
+        yield Input(placeholder="Search for any song, artist, or album on YouTube Music... (Press Enter)", id="search_input")
+        yield DataTable(id="song_list")
+        yield Static("Status: Ready to search", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
         self.theme = load_theme()
         self.player = MusicPlayer()
-        self.active_folder = ""
+        self.active_query = ""
         
         table = self.query_one(DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("ID", "Song Name")
+        table.add_columns("ID", "Artist", "Song Name", "Duration")
         
         self.set_interval(1.0, self.check_music_end)
         
-    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
-        self.load_folder(str(event.path))
-        
-    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        self.load_folder(str(event.path.parent))
-        
-    def load_folder(self, folder_path: str) -> None:
+    @work(exclusive=True, thread=True)
+    def handle_search(self, query: str) -> None:
+        self.app.call_from_thread(self.notify, f"Searching for '{query}'...")
         try:
-            songs = scan_folder(folder_path)
-            self.active_folder = folder_path
-            self.player.load_playlist(songs)
-            
-            table = self.query_one(DataTable)
-            table.clear()
-            for idx, song in enumerate(songs):
-                table.add_row(str(idx + 1), os.path.basename(song))
-                
-            self.notify(f"Successfully loaded {len(songs)} tracks!", title="Scanning Complete")
-            self.update_status()
-            
-        except FolderNotFoundError as e:
-            self.notify(str(e), title="Path Error", severity="error")
-        except NoAudioFilesFoundError:
-            self.notify(f"No files found in {os.path.basename(folder_path)}", title="No Audio", severity="warning")
+            results = search_songs(query, limit=15)
+            self.app.call_from_thread(self.populate_table, query, results)
+        except Exception as e:
+            self.app.call_from_thread(self.notify, f"Search Error: {str(e)}", severity="error")
 
-    def watch_player_index(self) -> None:
-        if self.player.current_index != -1 and self.player.playlist:
-            table = self.query_one(DataTable)
-            table.move_cursor(row=self.player.current_index)
+    def populate_table(self, query: str, results: list) -> None:
+        self.active_query = query
+        self.player.load_playlist(results)
+        
+        table = self.query_one(DataTable)
+        table.clear()
+        for idx, song in enumerate(results):
+            table.add_row(str(idx + 1), song["artists"], song["title"], song["duration"])
             
+        self.notify(f"Found {len(results)} results!", title="Search Complete")
+        self.update_status()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        query = event.value.strip()
+        if query:
+            self.handle_search(query)
+            
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        self.player.stop()
+        self.fetch_and_play(event.cursor_row)
+
+    @work(exclusive=True, thread=True)
+    def fetch_and_play(self, index: int) -> None:
+        if index < 0 or index >= len(self.player.playlist): return
+        
+        song = self.player.playlist[index]
+        self.app.call_from_thread(self.notify, f"Downloading: {song['title']}", title="Loading Cloud Track")
+        
+        try:
+            filepath = download_audio(song["videoId"])
+            self.app.call_from_thread(self.execute_play, index, filepath)
+        except Exception as e:
+            self.app.call_from_thread(self.notify, f"Download failed: {str(e)}", severity="error")
+
+    def execute_play(self, index: int, filepath: str) -> None:
+        self.player.play_local_file(index, filepath)
+        table = self.query_one(DataTable)
+        table.move_cursor(row=index)
+        self.update_status()
+
     def action_play(self) -> None:
         if not self.player.is_playing and not self.player.is_paused:
             table = self.query_one(DataTable)
             if table.cursor_row is not None and self.player.playlist:
-                self.player.play(table.cursor_row)
-            else:
-                return
-        self.update_status()
+                self.fetch_and_play(table.cursor_row)
+        else:
+            self.update_status()
 
     def action_toggle_pause(self) -> None:
         self.player.toggle_pause()
         self.update_status()
 
     def action_next(self) -> None:
-        self.player.next()
-        self.watch_player_index()
-        self.update_status()
+        if not self.player.playlist: return
+        next_idx = (self.player.current_index + 1) % len(self.player.playlist)
+        self.fetch_and_play(next_idx)
 
     def action_previous(self) -> None:
-        self.player.previous()
-        self.watch_player_index()
-        self.update_status()
+        if not self.player.playlist: return
+        prev_idx = (self.player.current_index - 1) % len(self.player.playlist)
+        self.fetch_and_play(prev_idx)
 
     def action_select_theme(self) -> None:
         self.push_screen(ThemeSelector())
@@ -195,23 +206,19 @@ class MusicPlayerApp(App):
 
     def update_status(self) -> None:
         status_widget = self.query_one("#status", Static)
+        
         if not self.player.playlist:
-            status_widget.update("Status: Select a folder from the tree on the left")
+            status_widget.update("Status: Start by searching above!")
             return
 
         song_name = self.player.get_current_song_name()
         state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
-        status = f"Folder: {os.path.basename(self.active_folder)} | Total: {len(self.player.playlist)} | {state} | Song: {song_name}"
+        status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | Song: {song_name}"
         status_widget.update(status)
 
     def check_music_end(self) -> None:
         if self.player.check_finished_naturally():
             self.action_next()
-            
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.player.stop()
-        self.player.play(event.cursor_row)
-        self.update_status()
 
 if __name__ == "__main__":
     app = MusicPlayerApp()

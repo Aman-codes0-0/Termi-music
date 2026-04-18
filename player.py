@@ -1,78 +1,57 @@
-import os
 import pygame
 
 class MusicPlayer:
-    """Encapsulates the Pygame audio playback logic."""
     def __init__(self):
         pygame.mixer.init()
-        self.playlist: list[str] = []
-        self.current_index: int = -1
-        self.is_playing: bool = False
-        self.is_paused: bool = False
+        self.playlist = [] # List of dictionary objects containing videoId
+        self.current_index = -1
+        self.is_playing = False
+        self.is_paused = False
 
-    def load_playlist(self, songs: list[str]) -> None:
-        """Loads a new list of absolute file paths to play."""
+    def load_playlist(self, songs: list) -> None:
         self.playlist = songs
-        self.current_index = 0 if songs else -1
+        self.current_index = -1
         self.stop()
 
-    def play(self, index: int) -> None:
-        """Plays a target song index from the playlist."""
-        if index < 0 or index >= len(self.playlist):
-            return
-            
-        self.current_index = index
+    def play_local_file(self, index: int, filepath: str) -> None:
         try:
-            pygame.mixer.music.load(self.playlist[self.current_index])
+            pygame.mixer.music.load(filepath)
             pygame.mixer.music.play()
+            self.current_index = index
             self.is_playing = True
             self.is_paused = False
-        except pygame.error:
-            pass # Fail silently as this is called sequentially
-
-    def toggle_pause(self) -> None:
-        """Toggles current loaded music between Play and Pause."""
-        if self.is_playing:
-            pygame.mixer.music.pause()
-            self.is_playing = False
-            self.is_paused = True
-        elif self.is_paused:
-            pygame.mixer.music.unpause()
-            self.is_playing = True
-            self.is_paused = False
-        elif self.current_index != -1:
-            # If completely stopped but we have an index, just play it
-            self.play(self.current_index)
+        except Exception as e:
+            pass
 
     def stop(self) -> None:
-        """Completely halts parsing audio."""
         pygame.mixer.music.stop()
         self.is_playing = False
         self.is_paused = False
 
-    def next(self) -> None:
-        if not self.playlist:
+    def toggle_pause(self) -> None:
+        if not self.is_playing and not self.is_paused:
             return
-        self.current_index = (self.current_index + 1) % len(self.playlist)
-        self.stop()
-        self.play(self.current_index)
+            
+        if self.is_paused:
+            pygame.mixer.music.unpause()
+            self.is_paused = False
+            self.is_playing = True
+        else:
+            pygame.mixer.music.pause()
+            self.is_paused = True
+            self.is_playing = False
 
-    def previous(self) -> None:
-        if not self.playlist:
-            return
-        self.current_index = (self.current_index - 1) % len(self.playlist)
-        self.stop()
-        self.play(self.current_index)
-        
-    def check_finished_naturally(self) -> bool:
-        """Returns True if the music stream hit its end without user stoppage."""
-        return self.is_playing and not pygame.mixer.music.get_busy()
-        
     def get_current_song_name(self) -> str:
-        """Returns the base filename of the playing song."""
-        if self.current_index == -1 or not self.playlist:
-            return ""
-        return os.path.basename(self.playlist[self.current_index])
-        
+        if 0 <= self.current_index < len(self.playlist):
+            return self.playlist[self.current_index].get("title", "Unknown")
+        return "None"
+
+    def check_finished_naturally(self) -> bool:
+        # If the music was playing, but now is not busy, and not paused, it finished naturally!
+        if self.is_playing and not pygame.mixer.music.get_busy() and not self.is_paused:
+            self.is_playing = False
+            return True
+        return False
+
     def quit(self) -> None:
         pygame.mixer.quit()
