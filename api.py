@@ -2,9 +2,11 @@ from ytmusicapi import YTMusic
 import yt_dlp
 import os
 import imageio_ffmpeg
+import threading
 
 ytmusic = YTMusic()
 CACHE_DIR = "/tmp/tui_music_cache"
+download_lock = threading.Lock()
 
 def ensure_cache():
     if not os.path.exists(CACHE_DIR):
@@ -33,31 +35,31 @@ def search_songs(query: str, limit: int = 20):
 
 def download_audio(video_id: str) -> str:
     """Download audio to cache and return the filepath.
-    Uses cached version if already exists!"""
-    ensure_cache()
-    out_path = os.path.join(CACHE_DIR, f"{video_id}.mp3")
-    
-    if os.path.exists(out_path):
+    Uses concurrency locks to prevent race conditions during background pre-fetching!"""
+    with download_lock:
+        ensure_cache()
+        out_path = os.path.join(CACHE_DIR, f"{video_id}.mp3")
+        
+        if os.path.exists(out_path):
+            return out_path
+            
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(CACHE_DIR, f"{video_id}.%(ext)s"),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '128',
+            }],
+            'ffmpeg_location': imageio_ffmpeg.get_ffmpeg_exe(),
+            'quiet': True,
+            'no_warnings': True,
+            'noprogress': True
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+            
         return out_path
-        
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(CACHE_DIR, f"{video_id}.%(ext)s"),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '128',
-        }],
-        'ffmpeg_location': imageio_ffmpeg.get_ffmpeg_exe(),
-        'quiet': True,
-        'no_warnings': True,
-        'noprogress': True
-    }
-    
-    # Run the YT-DLP engine directly within the Python space
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-        
-    return out_path

@@ -1,4 +1,5 @@
 import pygame
+import random
 
 class MusicPlayer:
     def __init__(self):
@@ -7,6 +8,53 @@ class MusicPlayer:
         self.current_index = -1
         self.is_playing = False
         self.is_paused = False
+        
+        # New V2.0 States
+        self.volume = 0.5
+        self.is_muted = False
+        self.is_shuffled = False
+        self.is_repeating = False
+        
+        pygame.mixer.music.set_volume(self.volume)
+
+    # -- V2.0 Controls --
+    def set_volume(self, val: float) -> None:
+        self.volume = max(0.0, min(1.0, val))
+        if not self.is_muted:
+            pygame.mixer.music.set_volume(self.volume)
+
+    def toggle_mute(self) -> None:
+        self.is_muted = not self.is_muted
+        if self.is_muted:
+            pygame.mixer.music.set_volume(0.0)
+        else:
+            pygame.mixer.music.set_volume(self.volume)
+
+    def toggle_shuffle(self) -> None:
+        self.is_shuffled = not self.is_shuffled
+
+    def toggle_repeat(self) -> None:
+        self.is_repeating = not self.is_repeating
+
+    def get_next_index(self) -> int:
+        if not self.playlist:
+            return -1
+        if self.is_repeating and self.current_index != -1:
+            return self.current_index
+        if self.is_shuffled:
+            return random.randint(0, len(self.playlist) - 1)
+        return (self.current_index + 1) % len(self.playlist)
+
+    def get_previous_index(self) -> int:
+        if not self.playlist:
+            return -1
+        if self.is_repeating and self.current_index != -1:
+            return self.current_index
+        if self.is_shuffled:
+            return random.randint(0, len(self.playlist) - 1)
+        return (self.current_index - 1) % len(self.playlist)
+
+    # -- End V2.0 Controls --
 
     def load_playlist(self, songs: list) -> None:
         self.playlist = songs

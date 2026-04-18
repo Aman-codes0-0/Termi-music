@@ -103,6 +103,13 @@ class MusicPlayerApp(App):
         Binding("space", "toggle_pause", "Pause/Resume", priority=True),
         Binding("n", "next", "Next", priority=True),
         Binding("b", "previous", "Previous", priority=True),
+        Binding("+", "volume_up", "Vol+", priority=True),
+        Binding("-", "volume_down", "Vol-", priority=True),
+        Binding("m", "toggle_mute", "Mute", priority=True),
+        Binding("/", "focus_search", "Search", priority=True),
+        Binding("escape", "focus_table", "List", priority=True, show=False),
+        Binding("s", "toggle_shuffle", "Shuffle", priority=True),
+        Binding("r", "toggle_repeat", "Repeat", priority=True),
         Binding("d", "select_theme", "Themes", priority=True),
         Binding("q", "quit", "Quit", priority=True),
     ]
@@ -174,7 +181,23 @@ class MusicPlayerApp(App):
         table = self.query_one(DataTable)
         table.move_cursor(row=index)
         self.update_status()
+        
+        # Secretly download the next track in the queue directly behind the scenes!
+        self.prefetch_next_song()
 
+    @work(exclusive=True, thread=True)
+    def prefetch_next_song(self) -> None:
+        next_idx = self.player.get_next_index()
+        if next_idx < 0 or next_idx >= len(self.player.playlist):
+            return
+            
+        song = self.player.playlist[next_idx]
+        try:
+            download_audio(song["videoId"]) # Caches the raw file silently in background
+        except:
+            pass
+
+    # -- Keybindings Actions --
     def action_play(self) -> None:
         if not self.player.is_playing and not self.player.is_paused:
             table = self.query_one(DataTable)
@@ -189,13 +212,37 @@ class MusicPlayerApp(App):
 
     def action_next(self) -> None:
         if not self.player.playlist: return
-        next_idx = (self.player.current_index + 1) % len(self.player.playlist)
-        self.fetch_and_play(next_idx)
+        self.fetch_and_play(self.player.get_next_index())
 
     def action_previous(self) -> None:
         if not self.player.playlist: return
-        prev_idx = (self.player.current_index - 1) % len(self.player.playlist)
-        self.fetch_and_play(prev_idx)
+        self.fetch_and_play(self.player.get_previous_index())
+
+    def action_volume_up(self) -> None:
+        self.player.set_volume(self.player.volume + 0.1)
+        self.update_status()
+
+    def action_volume_down(self) -> None:
+        self.player.set_volume(self.player.volume - 0.1)
+        self.update_status()
+
+    def action_toggle_mute(self) -> None:
+        self.player.toggle_mute()
+        self.update_status()
+        
+    def action_focus_search(self) -> None:
+        self.query_one("#search_input", Input).focus()
+
+    def action_focus_table(self) -> None:
+        self.query_one(DataTable).focus()
+
+    def action_toggle_shuffle(self) -> None:
+        self.player.toggle_shuffle()
+        self.update_status()
+
+    def action_toggle_repeat(self) -> None:
+        self.player.toggle_repeat()
+        self.update_status()
 
     def action_select_theme(self) -> None:
         self.push_screen(ThemeSelector())
@@ -211,9 +258,16 @@ class MusicPlayerApp(App):
             status_widget.update("Status: Start by searching above!")
             return
 
+        vol_pct = int(self.player.volume * 100)
+        vol_state = "MUTED" if self.player.is_muted else f"Vol: {vol_pct}%"
+        modes = []
+        if self.player.is_shuffled: modes.append("Shuffle")
+        if self.player.is_repeating: modes.append("Repeat")
+        mode_str = f"[{' | '.join(modes)}] | " if modes else ""
+
         song_name = self.player.get_current_song_name()
         state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
-        status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | Song: {song_name}"
+        status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {mode_str}Song: {song_name}"
         status_widget.update(status)
 
     def check_music_end(self) -> None:
