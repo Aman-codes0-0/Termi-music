@@ -1,12 +1,23 @@
 from ytmusicapi import YTMusic
 import yt_dlp
 import os
-import imageio_ffmpeg
 import threading
 
 ytmusic = YTMusic()
 CACHE_DIR = "/tmp/tui_music_cache"
 download_lock = threading.Lock()
+
+def is_termux() -> bool:
+    return 'com.termux' in os.environ.get('PREFIX', '') or 'ANDROID_ROOT' in os.environ
+
+def get_ffmpeg_path() -> str:
+    if is_termux():
+        return 'ffmpeg' # Native Android binaries assuming `pkg install ffmpeg` is ready
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return 'ffmpeg'
 
 def ensure_cache():
     if not os.path.exists(CACHE_DIR):
@@ -53,7 +64,7 @@ def download_audio(video_id: str) -> str:
                 'preferredcodec': 'mp3',
                 'preferredquality': '128',
             }],
-            'ffmpeg_location': imageio_ffmpeg.get_ffmpeg_exe(),
+            'ffmpeg_location': get_ffmpeg_path(),
             'quiet': True,
             'no_warnings': True,
             'noprogress': True
