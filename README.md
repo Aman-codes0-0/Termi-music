@@ -33,7 +33,7 @@ A lightweight, terminal-based music player that streams directly from YouTube Mu
    ```
 
 ### 📱 Android (Termux)
-1. Install Termux from F-Droid.
+1. Install Termux from F-Droid / Any Official Stores.
 2. Install the **Termux:API** app from F-Droid and the package in Termux:
    ```bash
    pkg install termux-api ffmpeg python ndk-sysroot clang make libjpeg-turbo

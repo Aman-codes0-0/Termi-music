@@ -1,5 +1,6 @@
-textual
-pygame
-ytmusicapi
-yt-dlp
-imageio-ffmpeg
+textual[dev]>=0.40.0
+pygame>=2.5.0
+ytmusicapi>=1.0.0
+yt-dlp>=2023.0.0
+imageio-ffmpeg>=0.4.0
+python-dotenv  # For future environment variable support if needed
