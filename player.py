@@ -69,8 +69,8 @@ class BaseMusicPlayer:
     def _apply_volume(self) -> None: pass
     def play_local_file(self, index: int, filepath: str) -> None: pass
     def stop(self) -> None: pass
-    def toggle_pause(self) -> None: pass
     def check_finished_naturally(self) -> bool: return False
+    def get_current_pos(self) -> float: return 0.0
     def quit(self) -> None: pass
 
 
@@ -130,6 +130,13 @@ class PygamePlayer(BaseMusicPlayer):
             self.is_playing = False
             return True
         return False
+
+    def get_current_pos(self) -> float:
+        if not HAS_PYGAME: return 0.0
+        # pygame.mixer.music.get_pos() returns ms since playback started
+        pos_ms = pygame.mixer.music.get_pos()
+        if pos_ms < 0: return 0.0
+        return pos_ms / 1000.0
 
     def quit(self) -> None:
         if not HAS_PYGAME: return
@@ -209,6 +216,24 @@ class TermuxPlayer(BaseMusicPlayer):
             pass
             
         return False
+
+    def get_current_pos(self) -> float:
+        if not self.is_playing or self.is_paused:
+            return 0.0
+        try:
+            result = subprocess.run(["termux-media-player", "info"], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if "Position:" in line:
+                    # Line looks like "Position: 00:15 / 03:45"
+                    pos_str = line.split(":")[1].split("/")[0].strip()
+                    parts = pos_str.split(":")
+                    if len(parts) == 2:
+                        return int(parts[0]) * 60 + int(parts[1])
+                    elif len(parts) == 3:
+                        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        except Exception:
+            pass
+        return 0.0
 
     def quit(self) -> None:
         self.stop()

@@ -2,7 +2,8 @@ import os
 import json
 from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, Input, OptionList
+from textual.widgets import Header, Footer, DataTable, Static, Input, OptionList, ProgressBar
+from textual.containers import Horizontal, Vertical
 from textual.widgets.option_list import Option
 from textual.binding import Binding
 from textual.screen import ModalScreen
@@ -86,14 +87,31 @@ class MusicPlayerApp(App):
         border: round $primary;
         background: $surface;
     }
+    #bottom_bar {
+        dock: bottom;
+        height: 9;
+        margin: 0 2;
+    }
+    #progress_container {
+        height: 3;
+        layout: horizontal;
+        align: left middle;
+    }
+    #time_display {
+        width: 16;
+        color: $accent;
+        text-style: bold;
+        background: $surface;
+    }
+    ProgressBar {
+        width: 1fr;
+    }
     #status {
         height: 3;
-        margin: 0 2 1 2;
-        dock: bottom;
-        content-align: center middle;
         background: $panel;
         color: $text;
         border: round $secondary;
+        content-align: center middle;
         text-style: bold;
     }
     """
@@ -139,7 +157,11 @@ class MusicPlayerApp(App):
         yield Header()
         yield Input(placeholder="Search YouTube Music...", id="search_input")
         yield DataTable(id="song_list")
-        yield Static("Status: Ready", id="status")
+        with Vertical(id="bottom_bar"):
+            with Horizontal(id="progress_container"):
+                yield Static("00:00 / 00:00", id="time_display")
+                yield ProgressBar(show_eta=False, show_percentage=False)
+            yield Static("Status: Ready", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -160,7 +182,10 @@ class MusicPlayerApp(App):
         if is_termux():
             table.add_columns("Artist", "Song")
         else:
-            table.add_columns("ID", "Artist", "Song Name", "Duration")
+            table.add_column("ID", width=4)
+            table.add_column("Artist", width=20)
+            table.add_column("Song Name", width=30)
+            table.add_column("Duration", width=10)
         
         self.set_interval(1.0, self.check_music_end)
         
@@ -168,7 +193,7 @@ class MusicPlayerApp(App):
     def handle_search(self, query: str) -> None:
         self.app.call_from_thread(self.notify, f"Searching for '{query}'...")
         try:
-            results = search_songs(query, limit=15)
+            results = search_songs(query, limit=50)
             self.app.call_from_thread(self.populate_table, query, results)
         except Exception as e:
             self.app.call_from_thread(self.notify, f"Search Error: {str(e)}", severity="error")
@@ -288,8 +313,29 @@ class MusicPlayerApp(App):
         self.player.quit()
         self.exit()
 
+    def parse_duration(self, duration_str) -> int:
+        """Converts MM:SS or HH:MM:SS to total seconds."""
+        if not duration_str or not isinstance(duration_str, str):
+            return 0
+        try:
+            parts = duration_str.split(":")
+            if len(parts) == 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        except:
+            pass
+        return 0
+
+    def format_time(self, seconds: float) -> str:
+        """Formats seconds to MM:SS."""
+        s = int(seconds)
+        return f"{s // 60:02d}:{s % 60:02d}"
+
     def update_status(self) -> None:
         status_widget = self.query_one("#status", Static)
+        time_widget = self.query_one("#time_display", Static)
+        progress_bar = self.query_one(ProgressBar)
         
         if not self.player.playlist:
             status_widget.update("Status: Start by searching above!")
@@ -305,14 +351,34 @@ class MusicPlayerApp(App):
         song_name = self.player.get_current_song_name()
         state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
         
+        # Update progress and time
+        current_song = self.player.playlist[self.player.current_index] if self.player.current_index >= 0 else None
+        time_str = "00:00 / 00:00"
+        if current_song and (self.player.is_playing or self.player.is_paused):
+            total_sec = self.parse_duration(current_song.get("duration", "0:00"))
+            current_sec = self.player.get_current_pos()
+            if total_sec <= 0:
+                total_sec = max(1, int(current_sec) + 1)
+            
+            time_str = f"{self.format_time(current_sec)} / {current_song.get('duration', '0:00')}"
+            time_widget.update(time_str)
+            progress_bar.total = total_sec
+            progress_bar.progress = current_sec
+        else:
+            time_widget.update(time_str)
+            progress_bar.total = 100
+            progress_bar.progress = 0
+
         from api import is_termux
         if is_termux():
             status = f"{state} | {vol_state} | {song_name[:20]}"
         else:
-            status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {mode_str}Song: {song_name}"
+            status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {time_str} | {mode_str}Song: {song_name}"
         status_widget.update(status)
 
     def check_music_end(self) -> None:
+        # Also refresh progress while checking for end
+        self.update_status()
         if self.player.check_finished_naturally():
             self.action_next()
 
