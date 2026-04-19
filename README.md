@@ -2,7 +2,6 @@
 
 A lightweight, terminal-based music player that streams directly from YouTube Music with **ZERO-LAG** pre-fetching. Now supports **Linux, Windows, and Android (Termux)**.
 
-![Termi-music Screenshot](screenshot.png)
 
 ## ✨ Features
 - **Cloud Streaming**: Search and play any song from YouTube Music.
