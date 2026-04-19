@@ -38,7 +38,16 @@ def _parse_songs_from_results(results: list) -> list:
     songs = []
     for r in results:
         artists = ", ".join([a.get('name', 'Unknown') for a in r.get('artists', [])])
-        duration = r.get('duration', '0:00') or '0:00'
+        
+        # Try to get duration from multiple fields
+        duration = r.get('duration')
+        if not duration:
+            seconds = r.get('duration_seconds')
+            if seconds:
+                duration = f"{seconds // 60}:{seconds % 60:02d}"
+            else:
+                duration = '0:00'
+        
         title = r.get('title', 'Unknown Title')
         videoId = r.get('videoId')
         if videoId:
@@ -106,17 +115,30 @@ def _get_artist_songs(query: str) -> list:
 
 
 def search_songs(query: str, limit: int = 20) -> list:
-    """Search for songs. If query matches an artist, return all their songs.
-    Otherwise fall back to a regular song search."""
+    """Search for songs.
+    
+    We prioritize regular song search (filter='songs') because it provides 
+    the best metadata (like durations) and ensures we get audio tracks 
+    rather than just video results.
+    """
+    # 1. Direct song search (Best results)
+    results = ytmusic.search(query, filter="songs", limit=limit)
+    songs = _parse_songs_from_results(results)
+    
+    if len(songs) >= 5: # If we got a decent amount of results, stick with them
+        return songs
 
-    # First try artist-based search
+    # 2. Fallback: Try artist-based search if regular search is sparse
     artist_songs = _get_artist_songs(query)
     if artist_songs:
-        return artist_songs
-
-    # Fallback: regular song search
-    results = ytmusic.search(query, filter="songs", limit=limit)
-    return _parse_songs_from_results(results)
+        # Merge results, prioritizing the direct ones
+        seen = {s['videoId'] for s in songs}
+        for s in artist_songs:
+            if s['videoId'] not in seen:
+                songs.append(s)
+                seen.add(s['videoId'])
+                
+    return songs[:limit]
 
 def _build_ydl_opts(video_id: str, cookies_from_browser: str | None = None) -> dict:
     """Build yt-dlp options dict, optionally with browser cookie extraction."""

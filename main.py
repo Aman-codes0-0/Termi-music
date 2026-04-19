@@ -139,7 +139,7 @@ class ModeSelector(ModalScreen):
     
     def compose(self) -> ComposeResult:
         with Vertical(id="mode_container"):
-            yield Label("Select Startup Mode:", style="bold")
+            yield Label("[b]Select Startup Mode:[/b]")
             yield Button("Local Music", id="btn_local", variant="primary")
             yield Button("Online Streaming", id="btn_online", variant="success")
 
@@ -249,8 +249,8 @@ class MusicPlayerApp(App):
         table.zebra_stripes = True
         
         table.add_column("ID", width=4)
-        table.add_column("Artist", width=20)
-        table.add_column("Song Name", width=30)
+        table.add_column("Artist", width=25)
+        table.add_column("Song Name", width=40)
         table.add_column("Duration", width=10)
         
         self.set_interval(1.0, self.check_music_end)
