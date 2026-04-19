@@ -42,24 +42,6 @@ This application is extremely lightweight and terminal-based, designed to run sm
    ```bash
    python main.py
    ```
-
-### 📱 Android (Termux)
-1. Install Termux from F-Droid / Any Official Stores.
-2. Install the **Termux:API** app from F-Droid and the package in Termux:
-   ```bash
-   pkg install termux-api ffmpeg python ndk-sysroot clang make libjpeg-turbo
-   ```
-3. Clone and setup:
-   ```bash
-   git clone https://github.com/Aman-codes0-0/Termi-music.git
-   cd Termi-music
-   pip install textual ytmusicapi yt-dlp
-   ```
-4. Run:
-   ```bash
-   python main.py
-   ```
-
 ## 🎮 Controls
 - `/`: Focus Search Box
 - `Enter`: Search / Select Song
