@@ -1,6 +1,8 @@
-# 🎵 Cloud TUI Music Player 🎵
+# 🎵 Termi-music 🎵
 
 A lightweight, terminal-based music player that streams directly from YouTube Music with **ZERO-LAG** pre-fetching. Now supports **Linux, Windows, and Android (Termux)**.
+
+![Termi-music Screenshot](screenshot.png)
 
 ## ✨ Features
 - **Cloud Streaming**: Search and play any song from YouTube Music.
@@ -23,8 +25,8 @@ This application is extremely lightweight and terminal-based, designed to run sm
 ### 🐧 Linux / 🪟 Windows
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Aman-codes0-0/tui-music-player.git
-   cd tui-music-player
+   git clone https://github.com/Aman-codes0-0/Termi-music.git
+   cd Termi-music
    ```
 2. Create and activate a virtual environment:
    ```bash
@@ -49,8 +51,8 @@ This application is extremely lightweight and terminal-based, designed to run sm
    ```
 3. Clone and setup:
    ```bash
-   git clone https://github.com/Aman-codes0-0/tui-music-player.git
-   cd tui-music-player
+   git clone https://github.com/Aman-codes0-0/Termi-music.git
+   cd Termi-music
    pip install textual ytmusicapi yt-dlp
    ```
 4. Run:
@@ -81,6 +83,6 @@ If you want to create a standalone executable that doesn't require Python:
    ```
 2. Run the build command:
    ```bash
-   pyinstaller --onefile --name "tui-music-player" --clean main.py
+   pyinstaller --onefile --name "Termi-music" --clean main.py
    ```
 3. The binary will be available in the `dist/` folder.
