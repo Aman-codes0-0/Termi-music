@@ -1,13 +1,13 @@
 import os
 import json
-from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, Input, OptionList, ProgressBar
+from textual.widgets import Header, Footer, DataTable, Static, Input, OptionList, ProgressBar, DirectoryTree, Button, Label
 from textual.containers import Horizontal, Vertical
 from textual.widgets.option_list import Option
 from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual import work
+from pathlib import Path
 
 from api import search_songs, download_audio
 from player import MusicPlayer
@@ -17,18 +17,18 @@ CONFIG_FILE = "config.json"
 def load_theme() -> str:
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("theme", "textual-dark")
-        except:
+        except Exception:
             pass
     return "textual-dark"
 
 def save_theme(theme_name: str) -> None:
     try:
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump({"theme": theme_name}, f)
-    except:
+    except Exception:
         pass
 
 class ThemeSelector(ModalScreen):
@@ -66,11 +66,106 @@ class ThemeSelector(ModalScreen):
     def action_dismiss_modal(self) -> None:
         self.dismiss()
 
+class FolderSelector(ModalScreen):
+    """Modal screen that asks for a folder path."""
+    
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
+    
+    CSS = """
+    FolderSelector {
+        align: center middle;
+    }
+    #folder_container {
+        width: 80%;
+        height: 80%;
+        padding: 1 2;
+        border: solid $secondary;
+        background: $surface;
+    }
+    DirectoryTree {
+        height: 1fr;
+        border: tall $background;
+        margin: 1 0;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        with Vertical(id="folder_container"):
+            yield Label("Navigate or enter the path to your Local Music folder:")
+            yield DirectoryTree(str(Path.home()))
+            yield Input(value=str(Path.home() / "Music"), id="folder_input")
+            yield Button("Scan Folder", id="scan_btn", variant="primary")
+            
+    def on_mount(self) -> None:
+        self.query_one("#folder_input", Input).focus()
+        
+    def on_tree_node_highlighted(self, event) -> None:
+        if event.node.data and hasattr(event.node.data, "path"):
+            self.query_one("#folder_input", Input).value = str(event.node.data.path)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "scan_btn":
+            path = self.query_one("#folder_input", Input).value
+            self.dismiss(path)
+            
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "folder_input":
+            self.dismiss(event.value)
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(None)
+
+class ModeSelector(ModalScreen):
+    """Modal screen that asks for startup mode."""
+    
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel")]
+    
+    CSS = """
+    ModeSelector {
+        align: center middle;
+    }
+    #mode_container {
+        width: 40%;
+        height: auto;
+        padding: 1 2;
+        border: solid $secondary;
+        background: $surface;
+    }
+    Button {
+        width: 100%;
+        margin: 1 0;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        with Vertical(id="mode_container"):
+            yield Label("Select Startup Mode:", style="bold")
+            yield Button("Local Music", id="btn_local", variant="primary")
+            yield Button("Online Streaming", id="btn_online", variant="success")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_local":
+            self.dismiss("local")
+        elif event.button.id == "btn_online":
+            self.dismiss("online")
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss("online")
+
 class MusicPlayerApp(App):
     """A Cross-Platform TUI Music Player"""
     
     TITLE = "🎵 Cloud TUI Music Player 🎵"
     ENABLE_COMMAND_PALETTE = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.theme = "textual-dark"
+        self.player = None
+        self.active_query = ""
+        self.search_results = []
+        self.mode = "online"
+        self.local_songs = []
     
     CSS = """
     Screen {
@@ -132,27 +227,6 @@ class MusicPlayerApp(App):
         Binding("q", "quit", "Quit", priority=True),
     ]
 
-    def get_compact_css(self) -> str:
-        """Returns compact CSS for Termux/Mobile."""
-        return """
-        Input {
-            margin: 0 1;
-            border: tall $secondary;
-        }
-        DataTable {
-            margin: 0 1;
-            border: none;
-        }
-        #status {
-            height: 2;
-            margin: 0;
-            border: none;
-            background: $surface;
-            text-style: none;
-            font-size: 80%;
-        }
-        """
-
     def compose(self) -> ComposeResult:
         yield Header()
         yield Input(placeholder="Search YouTube Music...", id="search_input")
@@ -166,52 +240,53 @@ class MusicPlayerApp(App):
 
     def on_mount(self) -> None:
         self.theme = load_theme()
-        from api import is_termux
-        if is_termux():
-            self.add_class("compact-mode")
-            # Inject compact CSS
-            self.app.stylesheet.add_source(self.get_compact_css())
-            
         self.player = MusicPlayer()
         self.active_query = ""
+        self.search_results = []
         
         table = self.query_one(DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
         
-        if is_termux():
-            table.add_columns("Artist", "Song")
-        else:
-            table.add_column("ID", width=4)
-            table.add_column("Artist", width=20)
-            table.add_column("Song Name", width=30)
-            table.add_column("Duration", width=10)
+        table.add_column("ID", width=4)
+        table.add_column("Artist", width=20)
+        table.add_column("Song Name", width=30)
+        table.add_column("Duration", width=10)
         
         self.set_interval(1.0, self.check_music_end)
+        self.push_screen(ModeSelector(), self.handle_mode_selection)
+
+    def handle_mode_selection(self, mode: str | None) -> None:
+        if mode == "local":
+            self.ask_for_folder()
+        else:
+            self.switch_to_online_mode()
         
     @work(exclusive=True, thread=True)
     def handle_search(self, query: str) -> None:
-        self.app.call_from_thread(self.notify, f"Searching for '{query}'...")
-        try:
-            results = search_songs(query, limit=50)
-            self.app.call_from_thread(self.populate_table, query, results)
-        except Exception as e:
-            self.app.call_from_thread(self.notify, f"Search Error: {str(e)}", severity="error")
+        if self.mode == "local":
+            self.app.call_from_thread(self.filter_local, query)
+        else:
+            self.app.call_from_thread(self.notify, f"Searching for '{query}'...")
+            try:
+                results = search_songs(query, limit=50)
+                self.app.call_from_thread(self.populate_table, query, results)
+            except Exception as e:
+                self.app.call_from_thread(self.notify, f"Search Error: {str(e)}", severity="error")
+
+    def filter_local(self, query: str) -> None:
+        q = query.lower()
+        filtered = [s for s in self.local_songs if q in s["title"].lower() or q in s["artists"].lower()]
+        self.populate_table(query, filtered)
 
     def populate_table(self, query: str, results: list) -> None:
         self.active_query = query
-        self.player.load_playlist(results)
+        self.search_results = results
         
         table = self.query_one(DataTable)
         table.clear()
-        from api import is_termux
         for idx, song in enumerate(results):
-            if is_termux():
-                # Shorten artist names for mobile
-                artist = song["artists"].split(",")[0][:15]
-                table.add_row(artist, song["title"])
-            else:
-                table.add_row(str(idx + 1), song["artists"], song["title"], song["duration"])
+            table.add_row(str(idx + 1), song["artists"], song["title"], song["duration"])
             
         self.notify(f"Found {len(results)} results!", title="Search Complete")
         self.update_status()
@@ -222,7 +297,10 @@ class MusicPlayerApp(App):
             self.handle_search(query)
             
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.player.stop()
+        if self.player.playlist is not self.search_results:
+            self.player.load_playlist(self.search_results)
+        else:
+            self.player.stop()
         self.fetch_and_play(event.cursor_row)
 
     @work(exclusive=True, thread=True)
@@ -230,18 +308,26 @@ class MusicPlayerApp(App):
         if index < 0 or index >= len(self.player.playlist): return
         
         song = self.player.playlist[index]
-        self.app.call_from_thread(self.notify, f"Downloading: {song['title']}", title="Loading Cloud Track")
-        
-        try:
-            filepath = download_audio(song["videoId"])
+        if song.get("is_local"):
+            self.app.call_from_thread(self.notify, f"Playing: {song['title']}", title="Local Track")
+            filepath = song["videoId"]
             self.app.call_from_thread(self.execute_play, index, filepath)
-        except Exception as e:
-            self.app.call_from_thread(self.notify, f"Download failed: {str(e)}", severity="error")
+        else:
+            self.app.call_from_thread(self.notify, f"Downloading: {song['title']}", title="Loading Cloud Track")
+            try:
+                filepath = download_audio(song["videoId"])
+                self.app.call_from_thread(self.execute_play, index, filepath)
+            except Exception as e:
+                self.app.call_from_thread(self.notify, f"Download failed: {str(e)}", severity="error")
 
     def execute_play(self, index: int, filepath: str) -> None:
         self.player.play_local_file(index, filepath)
-        table = self.query_one(DataTable)
-        table.move_cursor(row=index)
+        if self.player.playlist is self.search_results:
+            table = self.query_one(DataTable)
+            try:
+                table.move_cursor(row=index)
+            except Exception:
+                pass
         self.update_status()
         
         # Secretly download the next track in the queue directly behind the scenes!
@@ -254,16 +340,20 @@ class MusicPlayerApp(App):
             return
             
         song = self.player.playlist[next_idx]
+        if song.get("is_local"): return
+        
         try:
             download_audio(song["videoId"]) # Caches the raw file silently in background
-        except:
+        except Exception:
             pass
 
     # -- Keybindings Actions --
     def action_play(self) -> None:
         if not self.player.is_playing and not self.player.is_paused:
             table = self.query_one(DataTable)
-            if table.cursor_row is not None and self.player.playlist:
+            if table.cursor_row is not None and self.search_results:
+                if self.player.playlist is not self.search_results:
+                    self.player.load_playlist(self.search_results)
                 self.fetch_and_play(table.cursor_row)
         else:
             self.update_status()
@@ -309,8 +399,46 @@ class MusicPlayerApp(App):
     def action_select_theme(self) -> None:
         self.push_screen(ThemeSelector())
 
-    def action_quit(self) -> None:
+    def ask_for_folder(self) -> None:
+        def check_folder(path: str | None) -> None:
+            if path:
+                self.notify(f"Scanning {path}...", title="Local Mode")
+                self.scan_folder_background(path)
+            else:
+                self.switch_to_online_mode()
+
+        self.push_screen(FolderSelector(), check_folder)
+
+    @work(exclusive=True, thread=True)
+    def scan_folder_background(self, path: str) -> None:
+        from local_api import scan_local_directory
+        results = scan_local_directory(path)
+        self.app.call_from_thread(self.switch_to_local_mode, results, path)
+            
+    def switch_to_local_mode(self, results: list, path: str) -> None:
+        self.mode = "local"
+        self.local_songs = results
+        self.active_query = ""
+        search_input = self.query_one("#search_input", Input)
+        search_input.value = ""
+        search_input.placeholder = f"Search {path}..."
+        self.populate_table("", self.local_songs)
+        self.notify(f"Found {len(results)} local files.", title="Local Mode")
+        
+    def switch_to_online_mode(self) -> None:
+        self.mode = "online"
+        self.active_query = ""
+        self.search_results = []
+        search_input = self.query_one("#search_input", Input)
+        search_input.value = ""
+        search_input.placeholder = "Search YouTube Music..."
+        self.query_one(DataTable).clear()
+        self.update_status()
+
+    async def action_quit(self) -> None:
         self.player.quit()
+        from api import clear_cache
+        clear_cache()
         self.exit()
 
     def parse_duration(self, duration_str) -> int:
@@ -323,7 +451,7 @@ class MusicPlayerApp(App):
                 return int(parts[0]) * 60 + int(parts[1])
             elif len(parts) == 3:
                 return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-        except:
+        except Exception:
             pass
         return 0
 
@@ -337,7 +465,7 @@ class MusicPlayerApp(App):
         time_widget = self.query_one("#time_display", Static)
         progress_bar = self.query_one(ProgressBar)
         
-        if not self.player.playlist:
+        if not self.player.playlist and not getattr(self, 'search_results', []):
             status_widget.update("Status: Start by searching above!")
             return
 
@@ -347,12 +475,13 @@ class MusicPlayerApp(App):
         if self.player.is_shuffled: modes.append("Shuffle")
         if self.player.is_repeating: modes.append("Repeat")
         mode_str = f"[{' | '.join(modes)}] | " if modes else ""
+        mode_str = f"[MODE: {self.mode.upper()}] | " + mode_str
 
         song_name = self.player.get_current_song_name()
         state = "Playing" if self.player.is_playing else ("Paused" if self.player.is_paused else "Stopped")
         
         # Update progress and time
-        current_song = self.player.playlist[self.player.current_index] if self.player.current_index >= 0 else None
+        current_song = self.player.playlist[self.player.current_index] if 0 <= self.player.current_index < len(self.player.playlist) else None
         time_str = "00:00 / 00:00"
         if current_song and (self.player.is_playing or self.player.is_paused):
             total_sec = self.parse_duration(current_song.get("duration", "0:00"))
@@ -369,11 +498,8 @@ class MusicPlayerApp(App):
             progress_bar.total = 100
             progress_bar.progress = 0
 
-        from api import is_termux
-        if is_termux():
-            status = f"{state} | {vol_state} | {song_name[:20]}"
-        else:
-            status = f"Query: {self.active_query} | {len(self.player.playlist)} Results | {state} | {vol_state} | {time_str} | {mode_str}Song: {song_name}"
+        results_count = len(self.search_results) if self.search_results else len(self.player.playlist)
+        status = f"Query: {self.active_query} | {results_count} Results | {state} | {vol_state} | {time_str} | {mode_str}Song: {song_name}"
         status_widget.update(status)
 
     def check_music_end(self) -> None:

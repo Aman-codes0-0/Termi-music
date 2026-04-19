@@ -1,9 +1,4 @@
-import os
 import random
-import subprocess
-
-def is_termux() -> bool:
-    return 'com.termux' in os.environ.get('PREFIX', '') or 'ANDROID_ROOT' in os.environ
 
 try:
     import pygame
@@ -106,7 +101,7 @@ class PygamePlayer(BaseMusicPlayer):
         if not HAS_PYGAME: return
         try:
             pygame.mixer.music.stop()
-        except: pass
+        except Exception: pass
         self.is_playing = False
         self.is_paused = False
 
@@ -143,104 +138,6 @@ class PygamePlayer(BaseMusicPlayer):
         pygame.mixer.quit()
 
 
-class TermuxPlayer(BaseMusicPlayer):
-    """
-    Subprocess wrapper for execution securely on Android inside termux environment.
-    Directly commands the lightweight termux-media-player utility binary.
-    """
-    def __init__(self):
-        super().__init__()
-        self._check_tools()
-
-    def _check_tools(self):
-        try:
-            subprocess.run(["termux-media-player", "help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except FileNotFoundError:
-            print("\n[!] Error: termux-api tools not found.")
-            print("Please run: pkg install termux-api\n")
-
-    def _apply_volume(self) -> None:
-        try:
-            vol_val = 0 if self.is_muted else int(self.volume * 15)
-            subprocess.run(["termux-volume", "music", str(vol_val)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-
-    def play_local_file(self, index: int, filepath: str) -> None:
-        try:
-            self.stop()
-            result = subprocess.run(["termux-media-player", "play", filepath], capture_output=True, text=True)
-            if result.returncode != 0:
-                # Handle potential error if termux-media-player fails
-                pass
-            self.current_index = index
-            self.is_playing = True
-            self.is_paused = False
-            self._apply_volume()
-        except Exception:
-            pass
-
-    def stop(self) -> None:
-        try:
-            subprocess.run(["termux-media-player", "stop"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-        self.is_playing = False
-        self.is_paused = False
-
-    def toggle_pause(self) -> None:
-        if not self.is_playing and not self.is_paused: return
-        
-        try:
-            if self.is_paused:
-                subprocess.run(["termux-media-player", "play"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.is_paused = False
-                self.is_playing = True
-            else:
-                subprocess.run(["termux-media-player", "pause"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.is_paused = True
-                self.is_playing = False
-        except Exception:
-            pass
-
-    def check_finished_naturally(self) -> bool:
-        if not self.is_playing or self.is_paused:
-            return False
-            
-        try:
-            result = subprocess.run(["termux-media-player", "info"], capture_output=True, text=True)
-            if "Status: Stopped" in result.stdout or "No media playing" in result.stdout or result.stdout.strip() == "":
-                self.is_playing = False
-                return True
-        except Exception:
-            pass
-            
-        return False
-
-    def get_current_pos(self) -> float:
-        if not self.is_playing or self.is_paused:
-            return 0.0
-        try:
-            result = subprocess.run(["termux-media-player", "info"], capture_output=True, text=True)
-            for line in result.stdout.splitlines():
-                if "Position:" in line:
-                    # Line looks like "Position: 00:15 / 03:45"
-                    pos_str = line.split(":")[1].split("/")[0].strip()
-                    parts = pos_str.split(":")
-                    if len(parts) == 2:
-                        return int(parts[0]) * 60 + int(parts[1])
-                    elif len(parts) == 3:
-                        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-        except Exception:
-            pass
-        return 0.0
-
-    def quit(self) -> None:
-        self.stop()
-
-
 # Factory Return
 def MusicPlayer():
-    if is_termux():
-        return TermuxPlayer()
     return PygamePlayer()

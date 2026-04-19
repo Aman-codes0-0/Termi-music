@@ -4,10 +4,19 @@ A lightweight, terminal-based music player that streams directly from YouTube Mu
 
 ## ✨ Features
 - **Cloud Streaming**: Search and play any song from YouTube Music.
+- **Local Playback**: Instantly scan and play local audio files with manual folder selection.
 - **Queue & Pre-Fetching**: Automatically downloads the next song while you listen, making transitions instant.
-- **Universal Support**: Native drivers for Desktop (Pygame) and Android (Termux-API).
+- **Auto-Cleanup**: Temporary streaming cache is deleted upon exit to save storage.
 - **Modern TUI**: Built with Textual, featuring beautiful themes and keyboard-driven navigation.
 - **Custom Themes**: 40+ themes available.
+
+## 💻 System Requirements
+This application is extremely lightweight and terminal-based, designed to run smoothly even on older or low-end hardware.
+
+- **RAM**: ~40-60 MB at idle. Peaks around 80-150 MB during `yt-dlp` online audio extraction. (512 MB to 1 GB total system RAM is more than enough).
+- **CPU**: Minimal usage. Any standard processor from the last 10-15 years is fully capable of rendering the TUI and decoding audio without lag.
+- **Storage**: ~50-100 MB for the app and its Python dependencies. Cached online songs are automatically deleted when the app closes, ensuring your storage space remains free.
+- **Software**: Python 3.8+ and `ffmpeg` (required for extracting audio from YouTube streams).
 
 ## 🚀 Installation
 
@@ -53,6 +62,7 @@ A lightweight, terminal-based music player that streams directly from YouTube Mu
 - `/`: Focus Search Box
 - `Enter`: Search / Select Song
 - `Space`: Pause / Resume
+- `l`: Toggle Local / Online Mode
 - `n`: Next Song
 - `b`: Previous Song
 - `+ / -`: Volume Up / Down

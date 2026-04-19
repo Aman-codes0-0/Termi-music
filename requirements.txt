@@ -4,3 +4,5 @@ ytmusicapi>=1.0.0
 yt-dlp>=2023.0.0
 imageio-ffmpeg>=0.4.0
 python-dotenv  # For future environment variable support if needed
+secretstorage>=3.3.0  # Required by yt-dlp to decrypt Chrome cookies on Linux
+tinytag>=1.9.2  # For reading local audio metadata

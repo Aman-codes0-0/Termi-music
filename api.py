@@ -1,20 +1,13 @@
 from ytmusicapi import YTMusic
 import yt_dlp
 import os
+import shutil
 import threading
 
 ytmusic = YTMusic()
-def is_termux() -> bool:
-    return 'com.termux' in os.environ.get('PREFIX', '') or 'ANDROID_ROOT' in os.environ
-
 def get_cache_dir() -> str:
-    """Returns a writable cache directory, prioritized for Termux/Mobile."""
-    if is_termux():
-        # Use $HOME/.cache/tui_music_player in Termux
-        base = os.environ.get('HOME', '/data/data/com.termux/files/home')
-        path = os.path.join(base, '.cache', 'tui_music_cache')
-    else:
-        path = "/tmp/tui_music_cache"
+    """Returns a writable cache directory."""
+    path = "/tmp/tui_music_cache"
     
     if not os.path.exists(path):
         try:
@@ -29,8 +22,6 @@ CACHE_DIR = get_cache_dir()
 download_lock = threading.Lock()
 
 def get_ffmpeg_path() -> str:
-    if is_termux():
-        return 'ffmpeg' # Native Android binaries assuming `pkg install ffmpeg` is ready
     try:
         import imageio_ffmpeg
         return imageio_ffmpeg.get_ffmpeg_exe()
@@ -83,13 +74,7 @@ def _get_artist_songs(query: str) -> list:
         songs_data = artist_data.get('songs', {})
         songs_browse_id = songs_data.get('browseId')
         if songs_browse_id:
-            # Fetch all songs via the dedicated songs playlist
-            try:
-                playlist = ytmusic.get_artist_albums(artist_id, params=songs_data.get('params', ''))
-            except Exception:
-                playlist = None
-
-            # Fallback: use the songs directly available on artist page
+            # Use the songs directly available on artist page
             raw_songs = songs_data.get('results', [])
             songs.extend(_parse_songs_from_results(raw_songs))
 
@@ -133,38 +118,78 @@ def search_songs(query: str, limit: int = 20) -> list:
     results = ytmusic.search(query, filter="songs", limit=limit)
     return _parse_songs_from_results(results)
 
+def _build_ydl_opts(video_id: str, cookies_from_browser: str | None = None) -> dict:
+    """Build yt-dlp options dict, optionally with browser cookie extraction."""
+    opts = {
+        # Simple fallback chain: prefer audio-only streams, accept video+audio
+        # as a last resort so we always find *something* to download.
+        'format': 'bestaudio/best',
+        'format_sort': ['abr', 'asr', 'ext'],
+        'outtmpl': os.path.join(CACHE_DIR, f"{video_id}.%(ext)s"),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '128',
+        }],
+        'ffmpeg_location': get_ffmpeg_path(),
+        # Use the Android client — exposes more formats and is less restricted
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'quiet': True,
+        'no_warnings': True,
+        'noprogress': True,
+    }
+    if cookies_from_browser:
+        opts['cookiesfrombrowser'] = (cookies_from_browser,)
+    return opts
+
+
 def download_audio(video_id: str) -> str:
     """Download audio to cache and return the filepath.
-    Uses concurrency locks to prevent race conditions during background pre-fetching!"""
+
+    Automatically passes browser cookies to yt-dlp so YouTube doesn't
+    reject the request as a bot.  Tries Chrome first, then Firefox, and
+    finally falls back to a cookie-less attempt.
+
+    Uses a concurrency lock to prevent race conditions during background
+    pre-fetching.
+    """
     with download_lock:
         ensure_cache()
         out_path = os.path.join(CACHE_DIR, f"{video_id}.mp3")
-        
+
         if os.path.exists(out_path):
             return out_path
-            
+
         url = f"https://www.youtube.com/watch?v={video_id}"
-        
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': os.path.join(CACHE_DIR, f"{video_id}.%(ext)s"),
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '128',
-            }],
-            'ffmpeg_location': get_ffmpeg_path(),
-            'quiet': True,
-            'no_warnings': True,
-            'noprogress': True
-        }
-        
+
+        # Browsers to try in order; None = no cookies (last resort)
+        browsers_to_try: list[str | None] = ["chrome", "firefox", None]
+
+        last_error: Exception | None = None
+        for browser in browsers_to_try:
+            try:
+                ydl_opts = _build_ydl_opts(video_id, browser)
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                # If download succeeded the file now exists – return it
+                return out_path
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                if "ffmpeg" in err_str:
+                    raise RuntimeError(
+                        "FFmpeg not found. Please make sure ffmpeg is installed."
+                    ) from e
+                # If any error occurs (format not available, bot detection, etc.)
+                # just log it to last_error and let the loop continue to the next fallback.
+                continue
+
+        raise RuntimeError(f"Download failed: {str(last_error)}")
+
+def clear_cache() -> None:
+    """Removes all downloaded audio files in the cache directory."""
+    if os.path.exists(CACHE_DIR):
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-        except Exception as e:
-            if "ffmpeg" in str(e).lower():
-                raise RuntimeError("FFmpeg not found. Please install it using 'pkg install ffmpeg' in Termux.")
-            raise RuntimeError(f"Download failed: {str(e)}")
-            
-        return out_path
+            shutil.rmtree(CACHE_DIR)
+        except Exception:
+            pass
