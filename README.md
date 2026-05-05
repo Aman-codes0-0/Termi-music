@@ -1,4 +1,5 @@
 # 🎵 Termi-music 🎵
+
 A lightweight, terminal-based music player that streams directly from YouTube Music with **ZERO-LAG** pre-fetching. Now supports **Linux, Windows, and Android (Termux)**.
 
 <p align="center">
@@ -6,6 +7,7 @@ A lightweight, terminal-based music player that streams directly from YouTube Mu
 </p>
 
 ## Quick Start Video
+
 Experience Termi-music in action! Watch the demo video below to see how to get started:
 
 https://github.com/Aman-codes0-0/Termi-music/raw/main/tui_music.mp4
@@ -19,14 +21,32 @@ https://github.com/Aman-codes0-0/Termi-music/raw/main/tui_music.mp4
 - **Auto-Cleanup**: Temporary streaming cache is deleted upon exit to save storage.
 - **Modern TUI**: Built with Textual, featuring beautiful themes and keyboard-driven navigation.
 
-##  Installation
+## Installation
 
 ### 🐧 Linux / 🪟 Windows
+
 1. Clone the repository:
    ```bash
    git clone https://github.com/Aman-codes0-0/Termi-music.git
    cd Termi-music
    ```
+
+### ⚡ Direct Run (Recommended)
+You can now start the application automatically with a single command. The scripts will handle virtual environment creation and dependency installation for you.
+
+- **Windows**: Double-click `run.bat` or run:
+  ```cmd
+  run.bat
+  ```
+- **Linux/macOS**: Run:
+  ```bash
+  chmod +x run.sh && ./run.sh
+  ```
+
+---
+
+### 🛠️ Manual Installation
+If you prefer to set up the environment manually:
 2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
@@ -41,7 +61,9 @@ https://github.com/Aman-codes0-0/Termi-music/raw/main/tui_music.mp4
    ```bash
    python main.py
    ```
+
 ## 🎮 Controls
+
 - `/`: Focus Search Box
 - `Enter`: Search / Select Song
 - `Space`: Pause / Resume
