@@ -34,14 +34,10 @@ https://github.com/Aman-codes0-0/Termi-music/raw/main/tui_music.mp4
 ### ⚡ Direct Run (Recommended)
 You can now start the application automatically with a single command. The scripts will handle virtual environment creation and dependency installation for you.
 
-- **Windows**: Double-click `run.bat` or run:
-  ```cmd
-  run.bat
-  ```
-- **Linux/macOS**: Run:
-  ```bash
-  chmod +x run.sh && ./run.sh
-  ```
+| Platform | Download Script | Run Command |
+| :--- | :--- | :--- |
+| **Windows** | [📥 Download run.bat](https://github.com/Aman-codes0-0/Termi-music/raw/main/run.bat) | Double-click `run.bat` |
+| **Linux/macOS** | [📥 Download run.sh](https://github.com/Aman-codes0-0/Termi-music/raw/main/run.sh) | `chmod +x run.sh && ./run.sh` |
 
 ---
 
