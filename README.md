@@ -1,8 +1,4 @@
 # 🎵 Termi-music 🎵
-
-A lightweight, terminal-based music player that streams directly from YouTube Music with **ZERO-LAG** pre-fetching. Now supports **Linux, Windows, and Android (Termux)**.
-
-
 ## Features
 - **Cloud Streaming**: Search and play any song from YouTube Music.
 - **Local Playback**: Instantly scan and play local audio files with manual folder selection.
