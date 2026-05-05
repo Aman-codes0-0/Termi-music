@@ -31,9 +31,21 @@ https://github.com/Aman-codes0-0/Termi-music/raw/main/tui_music.mp4
    cd Termi-music
    ```
 
+### ⚡ Quick Run
+After cloning the repository, you can use these scripts to automatically set up the environment and start the player:
+
+- **Windows**:
+  ```cmd
+  run.bat
+  ```
+- **Linux/macOS**:
+  ```bash
+  chmod +x run.sh && ./run.sh
+  ```
+
 ---
 
-### 🛠️ Installation
+### 🛠️ Manual Installation
 If you prefer to set up the environment manually:
 2. Create and activate a virtual environment:
    ```bash
